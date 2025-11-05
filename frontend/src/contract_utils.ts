@@ -1,9 +1,10 @@
 import { ethers, Contract } from 'ethers';
 import EasyBetArtifact from './abi/EasyBet.json';
 import EasyTokenArtifact from './abi/EasyToken.json';
+import contractAddresses from './contract_addresses.json';
 
-const EASY_TOKEN_ADDRESS = '0x2c5f3c004878923f55A2a255F89Fe29393177509';
-const EASY_BET_ADDRESS = '0x2f3efA6bbDC5fAf4dC1a600765c7B7829e47bE10';
+const EASY_TOKEN_ADDRESS = contractAddresses.EasyToken;
+const EASY_BET_ADDRESS = contractAddresses.EasyBet;
 
 let easyBetContract: Contract | null = null;
 let easyTokenContract: Contract | null = null;
@@ -26,7 +27,7 @@ export const initContracts = async () => {
       // 强制切换到 Ganache 网络
       await window.ethereum.request({
         method: "wallet_switchEthereumChain",
-        params: [{ chainId: GANACHE_CHAIN_ID }], // 必须用十六进制链 ID
+        params: [{ chainId: GANACHE_CHAIN_ID }], 
       });
     }
 
@@ -35,7 +36,7 @@ export const initContracts = async () => {
     await provider.send("eth_requestAccounts", []); // 请求授权账户
     signer = provider.getSigner();
 
-    // 3. 验证合约地址是否在当前网络有效（可选但推荐）
+    // 3. 验证合约地址是否在当前网络有效
     const tokenCode = await provider.getCode(EASY_TOKEN_ADDRESS);
     if (tokenCode === "0x") {
       alert(`EasyToken 合约在当前网络不存在，请检查地址: ${EASY_TOKEN_ADDRESS}`);
@@ -79,31 +80,49 @@ export const initContracts = async () => {
     return false;
   }
 };
-
 export const setupAccountChangeListener = (callback: (newAccount: string) => void) => {
   if (typeof window.ethereum !== 'undefined') {
-    window.ethereum.on('accountsChanged', (accounts: string[]) => {
+    window.ethereum.on('accountsChanged', async (accounts: string[]) => {
       if (accounts.length > 0) {
-        // 更新 signer
-        if (provider) {
-          signer = provider.getSigner();
-          
-          // 重新初始化合约实例以使用新的 signer
-          if (easyTokenContract && easyBetContract) {
-            easyTokenContract = new ethers.Contract(
-              EASY_TOKEN_ADDRESS,
-              EasyTokenArtifact.abi,
-              signer
-            );
-            easyBetContract = new ethers.Contract(
-              EASY_BET_ADDRESS,
-              EasyBetArtifact.abi,
-              signer
-            );
+        try {
+          // 重新初始化 provider 和 signer
+          if (provider) {
+            signer = provider.getSigner();
+            
+            // 重新初始化合约实例以使用新的 signer
+            if (EASY_TOKEN_ADDRESS && EASY_BET_ADDRESS) {
+              easyTokenContract = new ethers.Contract(
+                EASY_TOKEN_ADDRESS,
+                EasyTokenArtifact.abi,
+                signer
+              );
+              easyBetContract = new ethers.Contract(
+                EASY_BET_ADDRESS,
+                EasyBetArtifact.abi,
+                signer
+              );
+              console.log("Contracts reinitialized with new account");
+            }
           }
           
           callback(accounts[0]);
+        } catch (error) {
+          console.error("Error reinitializing contracts after account change:", error);
+          // 尝试完整重新初始化
+          await initContracts();
+          callback(accounts[0]);
         }
+      }
+    });
+    
+    // 添加网络变更监听
+    window.ethereum.on('chainChanged', async (_chainId: string) => {
+      console.log("Network changed, reinitializing contracts...");
+      try {
+        await initContracts();
+        window.location.reload();
+      } catch (error) {
+        console.error("Error reinitializing after chain change:", error);
       }
     });
   }
@@ -145,21 +164,35 @@ export const faucet = async () => {
 export const placeBet = async (gambleId: number, amount: string, choice: number) => {
   if (easyBetContract && easyTokenContract && provider) {
     try {
-          
       const amountWei = ethers.utils.parseEther(amount);
-      const approveTx = await easyTokenContract.approve(easyBetContract.address, amountWei);
-      await approveTx.wait();
-    
-      // Place the bet
-      console.log("Placing bet...");
-      const tx = await easyBetContract.placeABet(gambleId, amountWei, choice);
-      console.log("Bet transaction sent:", tx.hash);
       
-      return false;
-    }
-    catch (error) {
-      console.error('Contracts not initialized');
-      alert('Contracts not initialized');
+      // 第一步：授权代币
+      console.log("正在授权代币...");
+      const approveTx = await easyTokenContract.approve(easyBetContract.address, amountWei);
+      console.log("授权交易已发送:", approveTx.hash);
+      
+      // 非阻塞等待授权确认
+      approveTx.wait().then(() => {
+        console.log("代币授权确认完成");
+      });
+      
+      await approveTx.wait();
+      
+      // 第二步：执行下注
+      console.log("正在下注...");
+      const tx = await easyBetContract.placeABet(gambleId, amountWei, choice);
+      console.log("下注交易已发送:", tx.hash);
+      
+      // 非阻塞等待下注确认
+      tx.wait().then(() => {
+        console.log("下注确认完成");
+      });
+      
+      await tx.wait();
+      
+      return true;
+    } catch (error) {
+      console.error('下注失败:', error);
       return false;
     }
   }

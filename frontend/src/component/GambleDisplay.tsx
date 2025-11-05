@@ -260,6 +260,7 @@ export default function GambleList() {
                       >
                         <div>
                           <p><strong>Bet ID:</strong> {bet.id}</p>
+                          <p><strong>所有者:</strong> {bet.owner.substring(0, 6)}...{bet.owner.substring(bet.owner.length - 4)}</p>
                           <p><strong>选项:</strong> {gamble.choices[parseInt(bet.betChoice)] || `选项 ${bet.betChoice}`}</p>
                           <p><strong>金额:</strong> {bet.betAmount} EBT</p>
                           <p><strong>状态:</strong> {bet.isListed ? '已挂单' : '未挂单'}</p>

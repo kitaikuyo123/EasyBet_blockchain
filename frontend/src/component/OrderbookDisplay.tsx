@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { getOrderBook, getGamble } from '../contract_utils';
+import { getOrderBook, getGamble, getBet } from '../contract_utils';
 import { Button } from './common';
 
 interface OrderBookEntry {
   price: string;
   choiceId: string;
   betId: string;
+  owner?: string; // 添加所有者字段
 }
 
 interface OrderBookDisplayProps {
@@ -27,7 +28,22 @@ export default function OrderBookDisplay({ gambleId, onBuyBet }: OrderBookDispla
         getGamble(gambleId)
       ]);
       
-      setOrderBook(orderBookData);
+      // 获取每个订单的所有者信息
+      const orderBookWithOwners: OrderBookEntry[] = [];
+      for (const entry of orderBookData) {
+        try {
+          const betData = await getBet(parseInt(entry.betId));
+          orderBookWithOwners.push({
+            ...entry,
+            owner: betData?.owner
+          });
+        } catch (error) {
+          console.error(`获取 bet ${entry.betId} 信息失败:`, error);
+          orderBookWithOwners.push(entry); // 即使获取所有者失败也保留原始数据
+        }
+      }
+      
+      setOrderBook(orderBookWithOwners);
       if (gambleData) {
         setGambleChoices(gambleData.choices);
       }
@@ -97,6 +113,9 @@ export default function OrderBookDisplay({ gambleId, onBuyBet }: OrderBookDispla
             >
               <div>
                 <p><strong>Bet ID:</strong> {entry.betId}</p>
+                {entry.owner && (
+                  <p><strong>所有者:</strong> {entry.owner.substring(0, 6)}...{entry.owner.substring(entry.owner.length - 4)}</p>
+                )}
                 <p><strong>选项:</strong> {gambleChoices[parseInt(entry.choiceId)] || `选项 ${entry.choiceId}`}</p>
                 <p><strong>价格:</strong> {entry.price} EBT</p>
               </div>

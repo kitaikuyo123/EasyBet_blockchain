@@ -145,7 +145,6 @@ contract EasyBet is ERC721("EasyBet", "EBT") {
         require(gamble.owner == msg.sender, "Only the owner can declare a result");
         require(choice < gamble.choices.length, "Invalid choice");
         require(!gamble.finished, "Gamble has already finished");
-        // require(block.timestamp > gamble.deadline, "Gamble is not over yet");
         gamble.winningChoice = choice;
         emit GambleResultDeclared(gambleId, choice);
     }
@@ -155,7 +154,6 @@ contract EasyBet is ERC721("EasyBet", "EBT") {
         require(gamble.owner == msg.sender, "Only the owner can finish the gamble");
         require(gamble.winningChoice != type(uint256).max, "Winning choice not declared");
         require(!gamble.finished, "Gamble is finished");
-        // require(block.timestamp > gamble.deadline, "Gamble is not over yet");
         
         gamble.finished = true;
 
@@ -176,6 +174,14 @@ contract EasyBet is ERC721("EasyBet", "EBT") {
                 Bet storage currentBet = bets[betId];
 
                 if (currentBet.betChoice == gamble.winningChoice) {
+                    // 添加调试信息
+                    console.log("Transferring prize for betId: %d", betId);
+                    console.log("Bet owner: %s", currentBet.owner);
+                    console.log("Prize amount: %d", prizePerWinner);
+                    
+                    // 确保所有者地址有效
+                    require(currentBet.owner != address(0), "Invalid bet owner");
+                    
                     easyToken.transfer(currentBet.owner, prizePerWinner);
                     emit PrizeClaimed(betId, prizePerWinner, currentBet.owner);
                 }
@@ -229,8 +235,8 @@ contract EasyBet is ERC721("EasyBet", "EBT") {
         // Transfer the bet NFT to the buyer
         _transfer(listing.owner, msg.sender, tokenId);
 
-        bets[tokenId].isListed = false;
         bets[tokenId].owner = msg.sender;
+        bets[tokenId].isListed = false;
 
         // Remove the listing
         removeListingFromOrderBook(bets[tokenId].gambleId, price, tokenId);
