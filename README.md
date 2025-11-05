@@ -38,9 +38,9 @@ function createAGamble(string[] memory choices, uint256 totalPrize, uint256 dead
 }
 ```
 1. 参数验证：
-- 至少需要2个选项
-- 奖金必须大于0
-- 截止时间必须在未来
+    - 至少需要2个选项
+    - 奖金必须大于0
+    - 截止时间必须在未来
 2. 资金处理：
 - 使用 transferFrom 要求创建者预先授权合约操作代币
 - 奖金从创建者账户转入合约账户
