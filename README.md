@@ -38,16 +38,13 @@ function createAGamble(string[] memory choices, uint256 totalPrize, uint256 dead
 }
 ```
 1. 参数验证：
-
 - 至少需要2个选项
 - 奖金必须大于0
 - 截止时间必须在未来
 2. 资金处理：
-
 - 使用 transferFrom 要求创建者预先授权合约操作代币
 - 奖金从创建者账户转入合约账户
 3. 数据存储：
-
 - 创建 Gamble 结构体存储项目信息
 - 初始化空的 betIds 数组用于跟踪后续下注
 - 设置 winningChoice 为最大值表示未公布结果
